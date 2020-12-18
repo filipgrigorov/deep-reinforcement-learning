@@ -35,7 +35,7 @@ def interact(env, agent, num_episodes=50000, window=100):
         samp_reward = 0
         while True:
             # agent selects an action
-            action = agent.select_action(state)
+            action = agent.select_action(i_episode, state)
 
             # agent performs the selected action
             next_state, reward, done, _ = env.step(action)
