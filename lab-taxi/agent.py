@@ -2,15 +2,27 @@ import numpy as np
 from collections import defaultdict
 class Agent:
     def __init__(self, nA=6):
-        self.alpha = 0.12
-        self.gamma = 1.0
+        self.alpha = 0.2
+        self.gamma = 0.9
         self.eps = 0.4
+        self.min_eps = 0.01
+        self.eps_decay_rate = 0.9995
         self.nA = nA
-        self.Q = defaultdict(lambda: np.zeros(self.nA))
+        print('Action space: ', self.nA)
+        self.Q = defaultdict(lambda: np.ones(self.nA))
 
-    def select_action(self, idx, state):
+    def select_actionv1(self, state):
+        self.eps *= self.eps_decay_rate
+        self.eps = min(self.eps, self.min_eps)
+        prob = np.random.uniform(0, 1)
+        if prob < self.eps:
+            return np.random.randint(0, self.nA - 1)
+        return np.argmax(self.Q[state])
+
+    def select_action(self, state):
         # Given the state, select an action. Selects eps-greedy selection
-        self.eps /= idx
+        self.eps *= self.eps_decay_rate
+        self.eps = max(self.eps, self.min_eps)
         probs = self.define_eps_greedy_probs(state)
         return np.random.choice(self.nA, p=probs)
 

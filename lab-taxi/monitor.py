@@ -3,7 +3,7 @@ import sys
 import math
 import numpy as np
 
-def interact(env, agent, num_episodes=20000, window=100):
+def interact(env, agent, num_episodes=50000, window=100):
     """ Monitor agent's performance.
     
     Params
@@ -35,7 +35,7 @@ def interact(env, agent, num_episodes=20000, window=100):
         samp_reward = 0
         while True:
             # agent selects an action
-            action = agent.select_action(i_episode, state)
+            action = agent.select_action(state)
 
             # agent performs the selected action
             next_state, reward, done, _ = env.step(action)
