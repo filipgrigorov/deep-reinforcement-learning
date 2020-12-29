@@ -45,18 +45,18 @@ class Agent():
         self.steps = 0
 
         # Replay memory (imitates the hypoccampus)``
-        n = int(1e5)
+        n = 10000
         self.memory = Memory(n, state_size)
 
     
     def step(self, state, action, reward, next_state, done):
         # Save the state in the replay memory
-        experience = namedtuple('Experience', 'state action reward next_state done')
+        experience = namedtuple('Experience', 'state action reward next_state')
         experience.state = state
         experience.action = action
         experience.reward = reward
         experience.next_state = next_state
-        experience.done = done
+        experience.dones = done
 
         self.memory.add(experience)
 
@@ -64,7 +64,7 @@ class Agent():
         if len(self.memory) > self.batch_size:
             states, actions, rewards, next_states, dones = self.memory.sample(self.batch_size)
 
-            self.learn([states, actions, rewards, next_states, dones], self.gamma)
+            self.learn([states, actions, next_states, dones], self.gamma)
 
 
     def act(self, state, eps=0.):
@@ -113,7 +113,7 @@ class Agent():
         # Call self.soft_update every C steps
         self.steps += 1
         if self.steps % STEPS == 0:
-            self.soft_update(self.behaviour, self.target, tau=1e-3)
+            self.soft_update(self.behaviour, self.target, tau=0.8)
 
 
     def soft_update(self, local_model, target_model, tau):
@@ -155,29 +155,13 @@ class Memory:
 
     def sample(self, batch_size):
         batch_sample = random.sample(self.ring_buffer, batch_size)
-        state_size = len(batch_sample[0].state)
-
         # Turn to torch tensors
-        states = np.zeros((batch_size, state_size))
-        actions = np.zeros((batch_size, 1))
-        rewards = np.zeros((batch_size, 1))
-        next_states = np.zeros((batch_size, state_size))
-        dones = np.zeros((batch_size, 1))
-
-        for idx in range(0, batch_size):
-            states[idx] = batch_sample[idx].state
-            actions[idx] = batch_sample[idx].action
-            rewards[idx] = batch_sample[idx].reward
-            next_states[idx] = batch_sample[idx].next_state
-            dones[idx] = batch_sample[idx].done
-
-        states = torch.FloatTensor(states).to(device)
-        actions = torch.tensor(actions, dtype=torch.int64).to(device)
-        rewards = torch.FloatTensor(rewards).to(device)
-        next_states = torch.FloatTensor(next_states).to(device)
-        dones = torch.FloatTensor(dones).to(device)
-
-        return (states, actions, rewards, next_states, dones)
+        states = torch.from_numpy(batch_sample[:, 1]).to(device)
+        actions = torch.from_numpy(batch_sample[:, 2]).to(device)
+        rewards = torch.from_numpy(batch_sample[:, 3]).to(device)
+        next_states = torch.from_numpy(batch_sample[:, 4]).to(device)
+        dones = torch.from_numpy(batch_sample[:, 5]).to(device)
+        return states, actions, rewards, next_states, dones
 
     def __len__(self):
         return len(self.ring_buffer)
@@ -202,7 +186,7 @@ def test_ring_buffer():
     buf = Memory(5, 8)
 
     for i in range(0, 6):
-        s = namedtuple('State', 'state, action, reward, next_state, done')
+        s = namedtuple('State', 'state, action, reward, next_state')
         s.state = np.random.choice(state_size, state_size)
         s.action = np.random.randint(0, 3)
         s.reward = round(np.random.uniform(0.0, 1.0), 2)
