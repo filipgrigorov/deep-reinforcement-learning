@@ -55,6 +55,12 @@ class Agent:
     def act(self, state, eps):
         return self._greedy_sample(state, eps)
 
+    def play(self, state):
+        self.behavioral_model.eval()
+        with torch.no_grad():
+            state = torch.from_numpy(state).cuda().float().unsqueeze(0)
+            return self.behavioral_model(state).argmax(dim=1).item()
+
     def train(self, state, action, reward, next_state, done):
         experience = Experience(state, action, reward, next_state, done)
         self.memory.add(experience)
@@ -67,11 +73,13 @@ class Agent:
     def _learn(self, experience):
         states, actions, rewards, next_states, dones = experience
 
+        # Double DQN:
         action_values = self.behavioral_model(next_states)
         max_indices = torch.argmax(action_values, dim=1).unsqueeze(1)
 
-        # Pick the values for the indices above: Double q value
+        # Pick the values for the indices above:
         targets = rewards + self.gamma * self.target_model(next_states).detach().gather(1, max_indices) * (1.0 - dones)
+        # DQN:
         #targets = rewards + self.gamma * self.target_model(next_states).detach().max(1)[0].unsqueeze(1) * (1.0 - dones)
 
         outputs = self.behavioral_model(states).gather(1, actions)
@@ -106,7 +114,6 @@ class Agent:
         for b_param, t_param in zip(self.behavioral_model.parameters(), self.target_model.parameters()):
             t_param.data.copy_(tau * b_param.data + (1.0 - tau) * t_param.data)
 
-# TODO: prioritized memory replay (according to paper)
 class Memory:
     def __init__(self, n, batch_size, seed):
         self.seed = random.seed(seed)
