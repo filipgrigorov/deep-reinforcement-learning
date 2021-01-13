@@ -1,77 +1,75 @@
 import copy
 import numpy as np
 
+from graphviz import Digraph
+
 class Node:
     def __init__(self, data, left, right):
         self.data = 0
         self.left = None
         self.right = None
 
-class MaxHeapTree:
+class BinaryTree:
     def __init__(self):
         self.current_idx = -1
         self.root = None
+        self.left = None
+        self.right = None
+
+        self.dot = Digraph()
 
     def is_empty(self):
-        return self.current_idx < 0
+        return self.root is None
 
-    def add(self, item):
-        last_node = self.root
-        while True:
-            if last_node is None or last_node.item is None:
-                self.current_idx += 1
-                if self.root is None:
-                    print('Root has been created')
-                    self.root = Node(item, self.current_idx, self.current_idx - 1, [Node(), Node()])
-                    last_node = self.root
-                else:
-                    print('Child has been created')
-                    last_node = Node(item, self.current_idx, self.current_idx - 1, [Node(), Node()])
-                self.tree.append(last_node)
-                print(f'Added {item} to {last_node.idx} from {last_node.parent_idx}\n')
-                break
-            side = 'left' if item <= last_node.item else 'right'
-            print('Going %s from %s' % (side, last_node.idx))
-            last_node = last_node.children[0 if item <= last_node.item else 1]
-            #print('After: ', hex(id(last_node)))
+    def add(self, data):
+        if self.is_empty():
+            print('Empty root')
+            self.root = self._add(self.root, data)
+        else:
+            if data <= self.root.data:
+                print('Going left of root')
+                self.root.left = self._add(self.root.left, data)
+            else:
+                print('Going right of root')
+                self.root.right = self._add(self.root.right, data)
 
-        # TODO
-        self.balance()
+    def _add(self, node, data):
+        if node is None:
+            print('Added a child\n')
+            node = Node(data, None, None)
+            return node
 
-    def balance(self):
-        pass
+        if data <= node.data:
+            print('Going left')
+            return self._add(node.left, data)
+        else:
+            print('Going right')
+            return self._add(node.right, data)
 
-    def dot_repr(self):
-        from graphviz import Digraph
+    def traverse(self):
+        self.preorder(self.root)
 
-        dot = Digraph()
+        return self.dot.source
 
-        # Create nodes first
-        edges = {}
-        for node in self.tree:
-            name = str(node.idx)
-            dot.node(name, str(node.item))
-
-            if node.children[0] is not None and node.children[1] is not None:
-                edges[name] = [ str(node.children[0].idx), str(node.children[1].idx) ]
-
-        print(edges)
-
-        # Create edges second
-        for from_idx, to_indices in edges.items():
-            dot.edge(from_idx, to_indices[0])
-            dot.edge(from_idx, to_indices[1])
-
-        print(dot.source)
+    def preorder(self, node):
+        if node is None: return
+        self.preorder(node.left)
+        print(node)
+        self.dot.node(str(node.data), str(node.data))
+        self.dot.node(str(node.left.data), str(node.left.data))
+        self.dot.node(str(node.left.data), str(node.left.data))
+        self.dot.edge(node.data, node.left.data)
+        self.dot.edge(node.data, node.right.data)
+        self.preorder(node.right)
 
 if __name__ == '__main__':
     l = [ 3, 9, 2, 1, 4, 5 ]
 
-    heap = MaxHeap()
+    heap = BinaryTree()
 
     for idx in range(0, len(l)):
         item = l[idx]
         print('{} Input item: {}'.format(idx, item))
         heap.add(item)
 
-    heap.dot_repr()
+    print(heap.traverse())
