@@ -3,6 +3,8 @@ import numpy as np
 
 from graphviz import Digraph
 
+# ref: https://stackoverflow.com/questions/5444394/how-to-implement-a-binary-search-tree-in-python
+
 class Node:
     def __init__(self, data, left, right):
         self.data = 0
