@@ -3,75 +3,43 @@ import numpy as np
 
 from graphviz import Digraph
 
-# ref: https://stackoverflow.com/questions/5444394/how-to-implement-a-binary-search-tree-in-python
-
-class Node:
-    def __init__(self, data, left, right):
-        self.data = 0
+class Tree:
+    def __init__(self, idx, data):
         self.left = None
         self.right = None
 
-class BinaryTree:
-    def __init__(self):
-        self.current_idx = -1
-        self.root = None
-        self.left = None
-        self.right = None
+        self.idx = idx
+        self.data = data
 
-        self.dot = Digraph()
+        print(f'Created a node with data {self.data}')
 
     def is_empty(self):
-        return self.root is None
+        return self.data is None
 
-    def add(self, data):
-        if self.is_empty():
-            print('Empty root')
-            self.root = self._add(self.root, data)
+    def insert(self, idx, data):
+        if not self.left and data <= self.data:
+            print(f'Left: {self.idx} -> {data}')
+            self.left = Tree(idx, data)
+            return
+        elif not self.right and data > self.data:
+            print(f'Right: {self.idx} -> {data}')
+            self.right = Tree(idx, data)
+            return
+        
+        if data <= self.data:
+            print(f'Left: {self.idx} -> {self.left.data}')
+            self.left.insert(idx, data)
         else:
-            if data <= self.root.data:
-                print('Going left of root')
-                self.root.left = self._add(self.root.left, data)
-            else:
-                print('Going right of root')
-                self.root.right = self._add(self.root.right, data)
-
-    def _add(self, node, data):
-        if node is None:
-            print('Added a child\n')
-            node = Node(data, None, None)
-            return node
-
-        if data <= node.data:
-            print('Going left')
-            return self._add(node.left, data)
-        else:
-            print('Going right')
-            return self._add(node.right, data)
-
-    def traverse(self):
-        self.preorder(self.root)
-
-        return self.dot.source
-
-    def preorder(self, node):
-        if node is None: return
-        self.preorder(node.left)
-        print(node)
-        self.dot.node(str(node.data), str(node.data))
-        self.dot.node(str(node.left.data), str(node.left.data))
-        self.dot.node(str(node.left.data), str(node.left.data))
-        self.dot.edge(node.data, node.left.data)
-        self.dot.edge(node.data, node.right.data)
-        self.preorder(node.right)
+            print(f'Right: {self.idx} -> {self.right.data}')
+            self.right.insert(idx, data)
 
 if __name__ == '__main__':
     l = [ 3, 9, 2, 1, 4, 5 ]
 
-    heap = BinaryTree()
+    # Note: Return a tree with an initialized data
+    tree = Tree(idx=0, data=l[0])
 
-    for idx in range(0, len(l)):
-        item = l[idx]
-        print('{} Input item: {}'.format(idx, item))
-        heap.add(item)
+    for idx in range(1, len(l)):
+        tree.insert(idx, l[idx])
 
-    print(heap.traverse())
+    print(tree)
