@@ -19,7 +19,7 @@ if __name__ == '__main__':
     states = env_info.vector_observations
     state_size = states.shape[1]
 
-    scores = []
+    series_scores = []
     average_scores = deque(maxlen=100)
 
     # Hyper-parameters:
@@ -39,19 +39,12 @@ if __name__ == '__main__':
 
         states = env_info.vector_observations                  # get the current state (for each agent)
 
-        scores = np.zeros(num_agents)                          # initialize the score (for each agent)
-
-        episodic_scores = []
+        episodic_scores = np.zeros(num_agents)                          # initialize the score (for each agent)
 
         while True:
             # (1) Generate action from actor
             actions = agent.step(states)                       # select an action (for each agent)
-
-            # debug
-            print(actions)
-
-            env.close()
-            raise('debug')
+            actions = np.clip(actions, -1, 1)
 
             env_info = env.step(actions)[brain_name]           # send all actions to tne environment
 
@@ -59,15 +52,13 @@ if __name__ == '__main__':
 
             # Normalize and clip rewards (future rewards)
             rewards = env_info.rewards                         # get reward (for each agent)
-            episodic_scores.append(np.mean([ R for R in rewards ]))
-            scores.append(np.mean([ R for R in rewards ]))
 
             dones = env_info.local_done                        # see if episode finished
 
             # (2) Collect experience
-            agent.remember(states, actions, rewards, next_states)
+            agent.remember(states, actions, rewards, next_states, dones)
 
-            scores += env_info.rewards                         # update the score (for each agent)
+            episodic_scores += env_info.rewards                         # update the score (for each agent)
 
             # (3) Act upon experience (learn)
             agent.act()
@@ -77,13 +68,14 @@ if __name__ == '__main__':
             if np.any(dones):                                  # exit loop if episode finished
                 break
 
-        average_scores.append(np.sum(episodic_scores))
+        series_scores.append(np.mean(episodic_scores))
+        average_scores.append(np.mean(episodic_scores))
 
         # Update eps
         eps *= eps_decay
         eps = min(eps, min_eps)
 
-        print('Total score (averaged over agents) this episode: {}'.format(np.mean(scores)))
+        print('Total score (averaged over agents) this episode: {}'.format(np.mean(episodic_scores)))
 
         # Check for last 100 average reward
         if np.mean(average_scores) >= 30:
@@ -94,5 +86,5 @@ if __name__ == '__main__':
     env.close()
 
     # Plot the scores
-    plt.plot(scores)
+    plt.plot(series_scores)
     plt.show()
