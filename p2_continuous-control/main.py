@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from agent import DDPGAgent
+from agent import Agent
 from collections import deque
 from unityagents import UnityEnvironment
 
@@ -23,16 +23,14 @@ if __name__ == '__main__':
     average_scores = deque(maxlen=100)
 
     # Hyper-parameters:
-    batch_size = 32
-    memory_size = 1e6
+    batch_size = 64
+    memory_size = 1e5
     gamma = 0.99
-    eps = 1.0
-    min_eps = 0.01
-    eps_decay = 0.99
-    soft_update_steps = 10000
-    agent = DDPGAgent(gamma, 1e-4, batch_size, soft_update_steps, state_size, action_size, memory_size, num_agents)
+    actor_lr = 1e-4
+    critic_lr = 1e-4
+    agent = Agent(gamma, actor_lr, critic_lr, batch_size, state_size, action_size, memory_size, num_agents)
 
-    nepisodes = 5000
+    nepisodes = 600
 
     for episode_idx in range(nepisodes):
         env_info = env.reset(train_mode=True)[brain_name]     # reset the environment
@@ -41,10 +39,11 @@ if __name__ == '__main__':
 
         episodic_scores = np.zeros(num_agents)                          # initialize the score (for each agent)
 
+        agent.reset()
+
         while True:
             # (1) Generate action from actor
             actions = agent.step(states)                       # select an action (for each agent)
-            actions = np.clip(actions, -1, 1)
 
             env_info = env.step(actions)[brain_name]           # send all actions to tne environment
 
@@ -71,11 +70,7 @@ if __name__ == '__main__':
         series_scores.append(np.mean(episodic_scores))
         average_scores.append(np.mean(episodic_scores))
 
-        # Update eps
-        eps *= eps_decay
-        eps = min(eps, min_eps)
-
-        print('Total score (averaged over agents) this episode: {}'.format(np.mean(episodic_scores)))
+        print('Total score (averaged over agents) for episode {}: {}'.format(episode_idx, np.mean(average_scores)))
 
         # Check for last 100 average reward
         if np.mean(average_scores) >= 30:
