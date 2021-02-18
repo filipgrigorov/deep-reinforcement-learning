@@ -31,8 +31,16 @@ batch_size = 128
 
 memory_size =1e5
 
-$\gamma = 0.99
+$\gamma$ = 0.99
 
 actor_lr = 1e-3
 
 critic_lr = 1e-3
+
+### Architecture
+
+Actor: 3 fully connected layers with a tanh activation on the output to bound the output between -1 and 1. There is one batch normalization layer after the first fully connected one.
+
+Critic: 3 fully connected layers where the second fully connected layer accepts as input (output_fc1 + action). There is one batch normalization layer after the first fully connected one.
+
+All other activation functions are leaky relu, in order to avoid dead neurons when learning.
