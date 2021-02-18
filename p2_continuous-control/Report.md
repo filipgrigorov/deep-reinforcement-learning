@@ -23,4 +23,11 @@ $$\theta_{\mu}^{'} = \tau * \theta_{\mu} + (1 - \tau) * \theta_{\mu}^{'}$$
 $$\theta_{Q}^{'} = \tau * \theta_{Q} + (1 - \tau) * \theta_{Q}^{'}$$
 where $\theta^{'}$ is the target.
 
+Hyper-parameters:
 
+seed = 1
+batch_size = 128
+memory_size =1e5
+$\gamma$ = 0.99
+actor_lr = 1e-3
+critic_lr = 1e-3
