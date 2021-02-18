@@ -16,7 +16,7 @@ num_agents = len(env_info.agents)
 print(f'Number of agents: {num_agents}')
 
 def run_ddpg(agent, n_episodes=500, max_t=1000, solved_score=30.0, average_over_episodes=100, log_every=1, train_mode=True,
-         actor_path='actor_ckpt.pth', critic_path='critic_ckpt.pth'):
+         actor_path='actor_checkpoint.pth', critic_path='critic_checkpoint.pth'):
 
     mean_scores = []                               # list of mean scores from each episode
     min_scores = []                                # list of lowest scores from each episode
