@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 # input: state (33 real numbers)
 # output action : [-1, 1]
@@ -8,64 +9,63 @@ import torch.nn as nn
 # "Fan-in" is a term that defines the maximum number of inputs that a system can accept
 # "Fan-out" is a term that defines the maximum number of inputs that the output of a system can feed to other systems
 
-torch.manual_seed(505)
-
-def init_weights_of(layer):
-    fan_in = layer.weight.data.size(0)
-    val = 1.0 / np.sqrt(fan_in)
-    layer.weight.data.uniform_(-val, val)
+def hidden_init(layer):
+    fan_in = layer.weight.data.size()[0]
+    lim = 1. / np.sqrt(fan_in)
+    return (-lim, lim)
 
 class Actor(nn.Module):
-    def __init__(self, input_size, output_size):
+    def __init__(self, seed, input_size, output_size):
         super(Actor, self).__init__()
 
-        self.layers = nn.Sequential(
+        torch.manual_seed(seed)
+
+        self.fc = nn.Sequential(
             nn.Linear(input_size, 400),
-            nn.BatchNorm1d(400),
-            nn.SELU(),
             nn.Linear(400, 300),
-            nn.BatchNorm1d(300),
-            nn.SELU()
+            nn.Linear(300, output_size)
         )
 
-        for idx in range(len(self.layers)):
-            layer = self.layers[idx]
-            if isinstance(layer, nn.Linear):
-                init_weights_of(layer)
+        self.bn = nn.BatchNorm1d(400)
 
-        self.output_layer = nn.Linear(300, output_size)
+        self.reset_parameters()
 
-        # Note: Initialize close to zero
-        torch.nn.init.uniform_(self.output_layer.weight, -3e-3, 3e-3)
+    def reset_parameters(self):
+        for idx in range(len(self.fc) - 1):
+            fc = self.fc[idx]
+            fc.weight.data.uniform_(*hidden_init(fc))
+
+        self.fc[-1].weight.data.uniform_(-3e-3, 3e-3)
 
     def forward(self, states):
-        return torch.tanh(self.output_layer(self.layers(states)))
+        outputs = F.leaky_relu(self.bn(self.fc[0](states)))
+        outputs = F.leaky_relu(self.fc[1](outputs))
+        outputs = torch.tanh(self.fc[-1](outputs))
+        return outputs
 
 class Critic(nn.Module):
-    def __init__(self, input_size, output_size):
+    def __init__(self, seed, input_size, action_size, output_size=1):
         super(Critic, self).__init__()
 
-        self.layers = nn.Sequential(
+        torch.manual_seed(seed)
+
+        self.fc = nn.Sequential(
             nn.Linear(input_size, 400),
-            nn.BatchNorm1d(400),
-            nn.SELU(),
-            nn.Linear(400, 300),
-            nn.BatchNorm1d(300),
-            nn.SELU()
+            nn.Linear(400 + action_size, 300),
+            nn.Linear(300, output_size)
         )
 
-        for idx in range(len(self.layers)):
-            layer = self.layers[idx]
-            if isinstance(layer, nn.Linear):
-                init_weights_of(layer)
+        self.bn = nn.BatchNorm1d(400)
 
-        self.output_layer = nn.Linear(300 + output_size, output_size)
+    def reset_parameters(self):
+        for idx in range(len(self.fc) - 1):
+            fc = self.fc[idx]
+            fc.weight.data.uniform_(*hidden_init(fc))
 
-        # Note: Initialize close to zero
-        torch.nn.init.uniform_(self.output_layer.weight, -3e-3, 3e-3)
+        self.fc[-1].weight.data.uniform_(-3e-3, 3e-3)
 
     def forward(self, states, actions):
-        # Note: According to paper, actions are included at the last output layer
-        outputs = self.layers(states)
+        outputs = F.leaky_relu(self.bn(self.fc[0](states)))
         outputs = torch.cat((outputs, actions), dim=1)
-        return self.output_layer(outputs)
+        outputs = F.leaky_relu(self.fc[1](outputs))
+        return self.fc[2](outputs)

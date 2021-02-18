@@ -8,23 +8,26 @@ import torch.optim as optim
 
 from collections import namedtuple
 from model import Actor, Critic
-from noise import OUNoise, OUNoiseSampler
+from noise import OUNoise
 
 Experience = namedtuple('Experience', 'state, action, reward, next_state, done')
+
+LEARN_EVERY = 20
+ITERS = 10
 
 class ActorPair:
     def __init__(self, learnt_actor, target_actor):
         self.learnt_actor = learnt_actor
         self.target_actor = target_actor
+        self.optim = None
 
 # Off-policy, actor-critic
 class Agent:
-    def __init__(self, gamma, actor_lr, critic_lr, batch_size, state_size, action_size, memory_size, num_agents):
+    def __init__(self, seed, gamma, actor_lr, critic_lr, batch_size, state_size, action_size, memory_size, num_agents):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         print(f'Using {self.device}')
 
-        self.steps = 0
-        self.nsteps = 20
+        self.timestep = 0
 
         self.gamma = gamma
         self.state_size = state_size
@@ -32,46 +35,44 @@ class Agent:
         self.num_agents = num_agents
 
         # Learns argmax_a[Q(s, a); theta_mu] = mu(s, a; theta_mu)
-        #self.learnt_actor = Actor(state_size, action_size).to(self.device) # learnt
-        #self.target_actor = Actor(state_size, action_size).to(self.device) # soft-update tracking
-
-        self.actors = []
-        for _ in range(num_agents):
-            pair = ActorPair(Actor(state_size, action_size).to(self.device), Actor(state_size, action_size).to(self.device))
-            self.actors.append(pair)
+        self.learnt_actor = Actor(seed, state_size, action_size).to(self.device) # learnt
+        self.target_actor = Actor(seed, state_size, action_size).to(self.device) # soft-update tracking
+        self.actor_optim = optim.Adam(self.learnt_actor.parameters(), lr=critic_lr)
 
         # Learns to evaluate Q(s, mu(s, a); theta_q)
-        self.learnt_critic = Critic(state_size, action_size).to(self.device) # learnt
-        self.target_critic = Critic(state_size, action_size).to(self.device) # soft-update tracking
+        self.learnt_critic = Critic(seed, state_size, action_size, 1).to(self.device) # learnt
+        self.target_critic = Critic(seed, state_size, action_size, 1).to(self.device) # soft-update tracking
+        self.critic_optim = optim.Adam(self.learnt_critic.parameters(), lr=critic_lr)
 
-        # Optimizers
-        self.actor_optim = optim.Adam(self.learnt_actor.parameters(), lr=actor_lr)
-        self.critic_optim = optim.Adam(self.learnt_critic.parameters(), lr=critic_lr, weight_decay=0.0001)
+        print(self.learnt_actor)
+        print(self.learnt_critic)
 
         # Note: Could be replaced by parallel env batching
         self.batch_size = batch_size
-        self.memory = Memory(memory_size, batch_size, 505)
+        self.memory = Memory(memory_size, batch_size, seed)
         self.memory.to(self.device)
 
         # Soft-update
         self.tau = 1e-3
 
         # Noise
-        #self.noise = OUNoiseSampler(action_size, 505)
-        self.noise = OUNoise(action_size, 505)
+        self.noise = OUNoise(action_size, seed)
+        self.noise_decay = 0.999
 
     def reset(self):
         self.noise.reset()
 
-    def step(self, states):
+    def act(self, states):
+        states = torch.tensor(states, dtype=torch.float32, device=self.device)
+
         self.learnt_actor.eval()
         with torch.no_grad():
-            states = torch.tensor(states, dtype=torch.float32, device=self.device)
             actions = self.learnt_actor(states).cpu().data.numpy()
-            actions += self.noise.sample()
-            actions = np.clip(actions, -1, 1)
         self.learnt_actor.train()
-        return actions
+
+        actions += self.noise_decay * self.noise.sample()
+
+        return np.clip(actions, -1, 1)
 
     def remember(self, states, actions, rewards, next_states, dones):
         n = len(states)
@@ -81,28 +82,16 @@ class Agent:
         assert(n == len(next_states))
         assert(n == len(dones))
 
-        for idx in range(n):
-            state = states[idx]
-            action = actions[idx]
-            reward = rewards[idx]
-            next_state = next_states[idx]
-            done = dones[idx]
-
+        for (state, action, reward, next_state, done) in zip(states, actions, rewards, next_states, dones):
             self.memory.add(Experience(state, action, reward, next_state, done))
 
-    def act(self):
-        if self.steps % self.nsteps == 0:
-            if len(self.memory) > self.batch_size:
-                for _ in range(10):
-                    self.__learn()
-            self.steps = 0
+    def step(self, timestep):
+        if len(self.memory) > self.batch_size and self.timestep % LEARN_EVERY == 0:
+            for _ in range(ITERS):
+                states, actions, rewards, next_states, dones = self.memory.sample()
+                self.__learn(states, actions, rewards, next_states, dones)
 
-    def __learn(self):
-
-        # Train critic using r + gamma * V(s)
-        states, actions, rewards, next_states, dones = self.memory.sample()
-
-
+    def __learn(self, states, actions, rewards, next_states, dones):
         # Critic ------------------------------------------------------------------------------------------------------------------------------
         # We want the most probable actions for St (continuous space)
         best_next_actions = self.target_actor(next_states)
@@ -121,7 +110,7 @@ class Agent:
 
         # Actor ------------------------------------------------------------------------------------------------------------------------------
         # Generate advantage and train actor (TD)
-        best_current_actions = self.target_actor(states)
+        best_current_actions = self.learnt_actor(states)
         advantage = -self.learnt_critic(states, best_current_actions).mean()
         
         self.actor_optim.zero_grad()
@@ -129,9 +118,11 @@ class Agent:
         self.actor_optim.step()
         # Actor ------------------------------------------------------------------------------------------------------------------------------
 
-
         self.soft_update(self.learnt_actor, self.target_actor, self.tau)
         self.soft_update(self.learnt_critic, self.target_critic, self.tau)
+
+        self.noise_decay *= self.noise_decay
+        self.reset()
 
     def soft_update(self, learnt, target, tau):
         for learnt_param, target_param in zip(learnt.parameters(), target.parameters()):
@@ -158,11 +149,11 @@ class Memory:
 
     def sample(self):
         samples = random.sample(self.ring_buffer, self.batch_size)
-        states = torch.FloatTensor([ entry.state for entry in samples ])
-        actions = torch.FloatTensor([ entry.action for entry in samples ])
-        rewards = torch.FloatTensor([ entry.reward for entry in samples ]).unsqueeze(1)
-        next_states = torch.FloatTensor([ entry.next_state for entry in samples ])
-        dones = torch.Tensor([ entry.done for entry in samples ]).unsqueeze(1)
+        states = torch.FloatTensor([ entry.state for entry in samples if entry is not None ])
+        actions = torch.FloatTensor([ entry.action for entry in samples if entry is not None ]).squeeze(1)
+        rewards = torch.FloatTensor([ entry.reward for entry in samples if entry is not None ]).unsqueeze(1)
+        next_states = torch.FloatTensor([ entry.next_state for entry in samples if entry is not None ])
+        dones = torch.Tensor([ entry.done for entry in samples if entry is not None ]).unsqueeze(1)
 
         return [ states.to(self.device), actions.to(self.device), rewards.to(self.device), next_states.to(self.device), dones.to(self.device) ]
 

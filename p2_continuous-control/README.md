@@ -14,7 +14,17 @@ For this project, you will work with the [Reacher](https://github.com/Unity-Tech
 
 In this environment, a double-jointed arm can move to target locations. A reward of +0.1 is provided for each step that the agent's hand is in the goal location. Thus, the goal of your agent is to maintain its position at the target location for as many time steps as possible.
 
-The observation space consists of 33 variables corresponding to position, rotation, velocity, and angular velocities of the arm. Each action is a vector with four numbers, corresponding to torque applicable to two joints. Every entry in the action vector should be a number between -1 and 1.
+
+### State and action space
+
+**(1) State**:
+
+The observation space consists of 33 variables corresponding to position, rotation, velocity, and angular velocities of the arm. 
+
+**(2) Action**:
+
+Each action is a vector with four numbers, corresponding to torque applicable to two joints. Every entry in the action vector should be a number between -1 and 1.
+
 
 ### Distributed Training
 
@@ -24,6 +34,7 @@ For this project, we will provide you with two separate versions of the Unity en
 
 The second version is useful for algorithms like [PPO](https://arxiv.org/pdf/1707.06347.pdf), [A3C](https://arxiv.org/pdf/1602.01783.pdf), and [D4PG](https://openreview.net/pdf?id=SyZipzbCb) that use multiple (non-interacting, parallel) copies of the same agent to distribute the task of gathering experience.  
 
+
 ### Solving the Environment
 
 Note that your project submission need only solve one of the two versions of the environment. 
@@ -32,7 +43,7 @@ Note that your project submission need only solve one of the two versions of the
 
 The task is episodic, and in order to solve the environment,  your agent must get an average score of +30 over 100 consecutive episodes.
 
-#### Option 2: Solve the Second Version
+#### Option 2: Solve the Second Version (Chosen option)
 
 The barrier for solving the second version of the environment is slightly different, to take into account the presence of many agents.  In particular, your agents must get an average score of +30 (over 100 consecutive episodes, and over all agents).  Specifically,
 - After each episode, we add up the rewards that each agent received (without discounting), to get a score for each agent.  This yields 20 (potentially different) scores.  We then take the average of these 20 scores. 
@@ -41,6 +52,14 @@ The barrier for solving the second version of the environment is slightly differ
 The environment is considered solved, when the average (over 100 episodes) of those average scores is at least +30. 
 
 ### Getting Started
+
+0. One would have to install:
+
+`pip install torch===1.7.1 torchvision===0.8.2 torchaudio===0.7.2 -f https://download.pytorch.org/whl/torch_stable.html`
+
+`pip install unityagents`
+
+`pip install mlagents`
 
 1. Download the environment from one of the links below.  You need only select the environment that matches your operating system:
 
@@ -64,7 +83,14 @@ The environment is considered solved, when the average (over 100 episodes) of th
 
 ### Instructions
 
-Follow the instructions in `Continuous_Control.ipynb` to get started with training your own agent!  
+
+**(1) Option 1**:
+
+Follow the instructions in `Continuous_Control.ipynb` to get started with training your own agent!
+
+**(2) OPtion 2**:
+
+One could run `main.py`, directly.
 
 ### (Optional) Challenge: Crawler Environment
 
