@@ -1,22 +1,26 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 import time
 import torch
 
-from agent import Agent
+from agent import DDPGAgent
 from collections import deque
 from unityagents import UnityEnvironment
 
-env = UnityEnvironment(file_name='Reacher_Windows_x86_64_many/Reacher.exe')
-brain_name = env.brain_names[0]
-brain = env.brains[brain_name]
+def train_ddpg(env, agent, config):
+    '''Runs the training loop'''
+    nepisodes = config['nepisodes']
+    ntimesteps = config['nsteps']
+    target_score = config['target_score']
 
-env_info = env.reset(train_mode=True)[brain_name]
-num_agents = len(env_info.agents)
-print(f'Number of agents: {num_agents}')
+    average_over_episodes = config['average_over_episodes']
 
-def run_ddpg(agent, n_episodes=500, max_t=1000, solved_score=30.0, average_over_episodes=100, log_every=1, train_mode=True,
-         actor_path='actor_checkpoint.pth', critic_path='critic_checkpoint.pth'):
+    actor_weights_path = config['actor_weights_path']
+    critic_weights_path = config['critic_weights_path']
+
+    brain_name = config['brain_name']
+    num_agents = config['number_agents']
 
     mean_scores = []                               # list of mean scores from each episode
     min_scores = []                                # list of lowest scores from each episode
@@ -25,9 +29,9 @@ def run_ddpg(agent, n_episodes=500, max_t=1000, solved_score=30.0, average_over_
     scores_window = deque(maxlen=average_over_episodes)  # mean scores from most recent episodes
     moving_avgs = []                               # list of moving averages
     
-    for i_episode in range(1, n_episodes + 1):
+    for i_episode in range(1, nepisodes + 1):
 
-        env_info = env.reset(train_mode=train_mode)[brain_name] # reset environment
+        env_info = env.reset(train_mode=True)[brain_name] # reset environment
         states = env_info.vector_observations                   # get current state for each agent
         scores = np.zeros(num_agents)                           # initialize score for each agent
 
@@ -35,8 +39,8 @@ def run_ddpg(agent, n_episodes=500, max_t=1000, solved_score=30.0, average_over_
 
         start_time = time.time()
 
-        for t in range(max_t):
-            actions = agent.act(states)         # select an action
+        for t in range(ntimesteps):
+            actions = agent.act(states)                         # select an action
 
             env_info = env.step(actions)[brain_name]            # send actions to environment
             next_states = env_info.vector_observations          # get next state
@@ -64,61 +68,85 @@ def run_ddpg(agent, n_episodes=500, max_t=1000, solved_score=30.0, average_over_
 
         moving_avgs.append(np.mean(scores_window))    # save moving average
 
-        if i_episode % log_every == 0:
-            print('\rEpisode {} ({} sec)  -- \tMin reward: {:.1f}\tMax reward: {:.1f}\tMean reward: {:.1f}\tMoving Average: {:.1f}'.format(
-                i_episode,
-                round(duration),
-                min_scores[-1],
-                max_scores[-1],
-                mean_scores[-1],
-                moving_avgs[-1])
-            )
+        print('\rEpisode {} ({} sec)  -- \tMin reward: {:.1f}\tMax reward: {:.1f}\tMean reward: {:.1f}\tMoving Average: {:.1f}'.format(
+            i_episode,
+            round(duration),
+            min_scores[-1],
+            max_scores[-1],
+            mean_scores[-1],
+            moving_avgs[-1])
+        )
         
-        if train_mode and mean_scores[-1] > best_score:
+        if mean_scores[-1] > best_score:
             # Note: Save every progress we make
-            torch.save(agent.learnt_actor.state_dict(), actor_path)
-            torch.save(agent.learnt_critic.state_dict(), critic_path)
+            torch.save(agent.learnt_actor.state_dict(), actor_weights_path)
+            torch.save(agent.learnt_critic.state_dict(), critic_weights_path)
 
-        if moving_avgs[-1] >= solved_score and i_episode >= average_over_episodes:
+        if moving_avgs[-1] >= target_score and i_episode >= average_over_episodes:
             print('\nEnvironment was solved in {} episodes!\tMoving Average ={:.1f} over last {} episodes'.format(
                 i_episode - average_over_episodes, 
                 moving_avgs[-1], 
                 average_over_episodes
             ))
 
-            torch.save(agent.learnt_actor.state_dict(), actor_path)
-            torch.save(agent.learnt_critic.state_dict(), critic_path)  
+            torch.save(agent.learnt_actor.state_dict(), actor_weights_path)
+            torch.save(agent.learnt_critic.state_dict(), critic_weights_path)  
             break
 
     return mean_scores, moving_avgs
 
 if __name__ == '__main__':
+    print('Launching environment!')
+
+    env = UnityEnvironment(file_name='Reacher_Windows_x86_64_many/Reacher.exe')
+    brain_name = env.brain_names[0]
+    brain = env.brains[brain_name]
+
+    env_info = env.reset(train_mode=True)[brain_name]
+    
     action_size = brain.vector_action_space_size
 
     states = env_info.vector_observations
     state_size = states.shape[1]
 
-    series_scores = []
-    average_scores = []
+    # Note: Could be extended to a cli (argparse)
+    agent_config = {
+        'seed': 1,
+        'batch_size': 128,
+        'memory_size': int(1e5),
+        'gamma': 0.99,
+        'tau': 1e-3,
+        'actor_lr': 1e-3,
+        'critic_lr': 1e-3,
+        'update_every': 20,
+        'update_iterations': 10,
+        'noise_decay': 0.999,
+        'number_agents': len(env_info.agents)
+    }
+    agent = DDPGAgent(state_size, action_size, agent_config)
 
-    # Hyper-parameters:
-    seed = 1
-    batch_size = 128
-    memory_size = int(1e5)
-    gamma = 0.99
-    actor_lr = 1e-3
-    critic_lr = 1e-3
-    agent = Agent(seed, gamma, actor_lr, critic_lr, batch_size, state_size, action_size, memory_size, num_agents)
-
-    scores, avgs = run_ddpg(agent)
+    root_path = 'weights'
+    training_config = {
+        'nepisodes': 500,
+        'nsteps': 1000,
+        'average_over_episodes': 100,
+        'target_score': 30,
+        'brain_name': brain_name,
+        'number_agents': len(env_info.agents),
+        'actor_weights_path': os.path.join(root_path, 'actor_weights_checkpoint.pth'),
+        'critic_weights_path': os.path.join(root_path, 'critic_weights_checkpoint.pth')
+    }
+    trajectory_scores, moving_average_scores = train_ddpg(env, agent, training_config)
+    len_scores = len(trajectory_scores)
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    plt.plot(np.arange(len(scores)), scores, label='DDPG')
-    plt.plot(np.arange(len(scores)), avgs, c='r', label='moving avg')
+    plt.plot(np.arange(len_scores), trajectory_scores, label='scores')
+    plt.plot(np.arange(len_scores), moving_average_scores, c='r', label='moving average')
     plt.ylabel('Score')
     plt.xlabel('Episode #')
-    plt.legend(loc='upper left');
+    plt.legend(loc='upper left')
     plt.show()
 
+    print('Closing the environment!')
     env.close()

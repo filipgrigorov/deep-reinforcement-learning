@@ -10,12 +10,15 @@ import torch.nn.functional as F
 # "Fan-out" is a term that defines the maximum number of inputs that the output of a system can feed to other systems
 
 def hidden_init(layer):
-    fan_in = layer.weight.data.size()[0]
+    '''Computes the limits of the randomization'''
+    fan_in = layer.weight.data.size(0)
     lim = 1. / np.sqrt(fan_in)
     return (-lim, lim)
 
 class Actor(nn.Module):
+    '''Actor network architecture'''
     def __init__(self, seed, input_size, output_size):
+        '''Class constructor'''
         super(Actor, self).__init__()
 
         torch.manual_seed(seed)
@@ -28,9 +31,10 @@ class Actor(nn.Module):
 
         self.bn = nn.BatchNorm1d(400)
 
-        self.reset_parameters()
+        self.init_parameters()
 
-    def reset_parameters(self):
+    def init_parameters(self):
+        '''Weights initialization'''
         for idx in range(len(self.fc) - 1):
             fc = self.fc[idx]
             fc.weight.data.uniform_(*hidden_init(fc))
@@ -38,13 +42,16 @@ class Actor(nn.Module):
         self.fc[-1].weight.data.uniform_(-3e-3, 3e-3)
 
     def forward(self, states):
+        '''Forward pass override of the nn.Module'''
         outputs = F.leaky_relu(self.bn(self.fc[0](states)))
         outputs = F.leaky_relu(self.fc[1](outputs))
         outputs = torch.tanh(self.fc[-1](outputs))
         return outputs
 
 class Critic(nn.Module):
+    '''Critic network architecture'''
     def __init__(self, seed, input_size, action_size, output_size=1):
+        '''Class constructor'''
         super(Critic, self).__init__()
 
         torch.manual_seed(seed)
@@ -57,7 +64,10 @@ class Critic(nn.Module):
 
         self.bn = nn.BatchNorm1d(400)
 
-    def reset_parameters(self):
+        self.init_parameters()
+
+    def init_parameters(self):
+        '''Weights initialization'''
         for idx in range(len(self.fc) - 1):
             fc = self.fc[idx]
             fc.weight.data.uniform_(*hidden_init(fc))
@@ -65,6 +75,7 @@ class Critic(nn.Module):
         self.fc[-1].weight.data.uniform_(-3e-3, 3e-3)
 
     def forward(self, states, actions):
+        '''Forward pass override of the nn.Module'''
         outputs = F.leaky_relu(self.bn(self.fc[0](states)))
         outputs = torch.cat((outputs, actions), dim=1)
         outputs = F.leaky_relu(self.fc[1](outputs))
