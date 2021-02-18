@@ -31,7 +31,7 @@ batch_size = 128
 
 memory_size =1e5
 
-$\gamma$ = 0.99
+$\gamma = 0.99
 
 actor_lr = 1e-3
 
