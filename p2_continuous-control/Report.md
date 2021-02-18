@@ -26,8 +26,13 @@ where $\theta^{'}$ is the target.
 Hyper-parameters:
 
 seed = 1
+
 batch_size = 128
+
 memory_size =1e5
+
 $\gamma$ = 0.99
+
 actor_lr = 1e-3
+
 critic_lr = 1e-3
