@@ -4,6 +4,9 @@
 
 
 
+$\theta
+
+
 ### Architecture
 
 Actor: 3 fully connected layers (`nn.Linear`) with a tanh activation on the output to bound the output between -1 and 1. There is one batch normalization layer after the first fully connected one (`nn.BatchNorm1d`).
