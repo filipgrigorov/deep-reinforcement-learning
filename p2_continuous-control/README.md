@@ -92,7 +92,7 @@ One should be interested by the folder `p2_continuous-control`.
 
 Follow the instructions in `Continuous_Control.ipynb` to get started with training your own agent!
 
-**(2) OPtion 2**:
+**(2) Option 2**:
 
 One could run `main.py`, directly.
 
