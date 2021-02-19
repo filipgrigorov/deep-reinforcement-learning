@@ -16,6 +16,10 @@ Critic: 3 fully connected layers where the second fully connected layer accepts 
 
 All other activation functions are `F.leaky_relu`, in order to avoid dead neurons when learning.
 
+### Training results
+
+![alt](imgs/plot_scores.png)
+
 ### Ideas for future work
 
 Given the parallel agent environment, I would like to try out `A3C` or `D4PG`. I believe that these would work well. Anything that exploits the multiple agents would benefit greatly.
