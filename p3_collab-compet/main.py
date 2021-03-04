@@ -35,7 +35,7 @@ def run_training(config):
 
     config = {
         'seed': 1,
-        'batch_size': 128,
+        'batch_size': 2,#128
         'memory_size': int(1e5),
         'gamma': 0.99,
         'tau': 1e-3,
@@ -69,9 +69,7 @@ def run_training(config):
 
             maddpg.remember(states, actions, rewards, next_states, dones)
 
-            maddpg.step()
-
-            raise('debug')
+            maddpg.step(t)
             
             scores += env_info.rewards                         # update the score (for each agent)
             

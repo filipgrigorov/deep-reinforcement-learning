@@ -42,9 +42,9 @@ class Actor(nn.Module):
 
         self.fc[-1].weight.data.uniform_(-3e-3, 3e-3)
 
-    def forward(self, states):
+    def forward(self, state):
         '''Forward pass override of the nn.Module'''
-        outputs = F.leaky_relu(self.bn(self.fc[0](states)))
+        outputs = F.leaky_relu(self.bn(self.fc[0](state)))
         outputs = F.leaky_relu(self.fc[1](outputs))
         outputs = torch.tanh(self.fc[-1](outputs))
         return outputs
@@ -69,9 +69,9 @@ class Critic(nn.Module):
 
         self.fc[-1].weight.data.uniform_(-3e-3, 3e-3)
 
-    def forward(self, states, actions):
+    def forward(self, state, actions):
         '''Forward pass override of the nn.Module'''
-        outputs = F.leaky_relu(self.bn(self.fc[0](states)))
+        outputs = F.leaky_relu(self.bn(self.fc[0](state)))
         outputs = torch.cat((outputs, actions), dim=1)
         outputs = F.leaky_relu(self.fc[1](outputs))
         return self.fc[2](outputs)

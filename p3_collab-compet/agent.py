@@ -7,9 +7,6 @@ from memory import Memory, Experience
 from model import Actor, Critic
 from noise import OUNoise
 
-LEARN_EVERY = 20
-ITERS = 10
-
 class DDPGAgent:
     '''Class representing the DDPG algorithm'''
     def __init__(self, state_size, action_size, num_agents, device, config):
@@ -42,10 +39,11 @@ class DDPGAgent:
         self.noise = OUNoise(action_size, seed)
         self.noise_decay = config['noise_decay']
 
-    def reset(self):
+    def reset_noise(self):
         '''Reset the noise state'''
         self.noise.reset()
 
+    # Note: Decentralized actors (execution)
     def act(self, state):
         '''Sample an action from the policy'''
         state = torch.tensor(state, dtype=torch.float32, device=self.device)
@@ -59,27 +57,22 @@ class DDPGAgent:
 
         return np.clip(actions, -1, 1)
 
-    def step(self, idx, states, actions, rewards, next_states, dones):
-        '''Wraps and controls the training of the function approximators using soft-updating'''
-        self.__learn(idx, states, actions, rewards, next_states, dones)
-
-    def __learn(self, idx, states, actions, rewards, next_states, dones):
+    # Note: Centralized critic (training)
+    def step(self, best_current_actions, best_next_actions, states, actions, rewards, next_states, dones):
         '''Optimizes the function apprximators and soft-updates'''
 
-        self.__optimize_critic(idx, states, actions, rewards, next_states, dones)
+        self.__optimize_critic(best_next_actions, states, actions, rewards, next_states, dones)
 
-        self.__optimize_actor(states)
+        self.__optimize_actor(best_current_actions, states)
 
         self.__soft_update(self.learnt_actor, self.target_actor, self.tau)
         self.__soft_update(self.learnt_critic, self.target_critic, self.tau)
 
         self.noise_decay *= self.noise_decay
-        self.reset()
+        self.reset_noise()
 
-    def __optimize_critic(self, idx, states, actions, rewards, next_states, dones):
+    def __optimize_critic(self, best_next_actions, states, actions, rewards, next_states, dones):
         '''Optimizes the critic approximator'''
-        best_next_actions = self.target_actor(next_states[np.newaxis, idx])
-        # Do we need to feed in the actions from all the actors???
         q_targets = rewards + self.gamma * self.target_critic(next_states, best_next_actions) * (1 - dones)
 
         q_predictions = self.learnt_critic(states, actions)
@@ -90,10 +83,8 @@ class DDPGAgent:
         torch.nn.utils.clip_grad_norm_(self.learnt_critic.parameters(), 1)
         self.critic_optim.step()
 
-    def __optimize_actor(self, states):
+    def __optimize_actor(self, best_current_actions, states):
         '''Optimizes the actor approximator'''
-        best_current_actions = self.learnt_actor(states)
-        # Do we need to feed in the actions from all the actors???
         advantage = -self.learnt_critic(states, best_current_actions).mean()
         
         self.actor_optim.zero_grad()
@@ -118,6 +109,9 @@ class MADDPG:
 
         self.ddpg_agents = [ DDPGAgent(state_size, action_size, num_agents, self.device, config) for _ in range(num_agents) ]
 
+        self.update_every = config['update_every']
+        self.update_iters = config['update_iterations']
+
         # Note: Could be replaced by parallel env batching
         seed = config['seed']
         self.batch_size = config['batch_size']
@@ -125,11 +119,11 @@ class MADDPG:
         self.memory.to_device(self.device)
 
     def reset_noise(self):
-        [ agent.reset() for agent in self.ddpg_agents ]
+        [ agent.reset_noise() for agent in self.ddpg_agents ]
 
     def act(self, states):
         ''' For each agent idx, select a_idx = policy_idx(o_idx) + noise '''
-        actions = [ self.ddpg_agents[idx].act(states[np.newaxis, idx]) for idx in range(self.num_agents) ]
+        actions = [ self.ddpg_agents[idx].act(states[np.newaxis, idx]).squeeze(0) for idx in range(self.num_agents) ]
         return actions
 
     # Note: We need to add all the observations, otherwise we break the stationarity of the environment
@@ -138,8 +132,20 @@ class MADDPG:
         self.memory.add(Experience(states, actions, rewards, next_states, dones))
 
     def step(self, timestep):
-        if len(self.memory) > self.batch_size and timestep % LEARN_EVERY == 0:
-            for _ in range(ITERS):
+        if len(self.memory) > self.batch_size and timestep % self.update_every == 0:
+            for _ in range(self.update_iters):
                 for idx in range(self.num_agents):
                     states, actions, rewards, next_states, dones = self.memory.sample()
-                    self.ddpg_agents[idx].step(idx, states, actions, rewards, next_states, dones)
+                    
+                    predicted_best_next_actions = torch.cat([self.ddpg_agents[idx].target_actor(next_states[:, idx, :]) for idx in range(self.num_agents)], dim=1)
+
+                    predicted_best_current_actions = torch.cat([self.ddpg_agents[idx].learnt_actor(states[:, idx, :]) for idx in range(self.num_agents)], dim=1)
+
+                    states = torch.cat([ states[:, idx, :] for idx in range(self.num_agents) ], dim=1)
+                    actions = torch.cat([ actions[:, idx, :] for idx in range(self.num_agents) ], dim=1)
+                    next_states = torch.cat([ next_states[:, idx, :] for idx in range(self.num_agents) ], dim=1)
+
+                    self.ddpg_agents[idx].step(
+                        predicted_best_current_actions,
+                        predicted_best_next_actions,
+                        states, actions, rewards, next_states, dones)

@@ -32,10 +32,10 @@ class Memory:
         '''Samples random data'''
         samples = random.sample(self.ring_buffer, self.batch_size)
         states = torch.FloatTensor([ entry.states for entry in samples if entry is not None ])
-        actions = torch.FloatTensor([ entry.actions for entry in samples if entry is not None ]).squeeze(1)
-        rewards = torch.FloatTensor([ entry.rewards for entry in samples if entry is not None ]).unsqueeze(1)
+        actions = torch.FloatTensor([ entry.actions for entry in samples if entry is not None ])
+        rewards = torch.FloatTensor([ entry.rewards for entry in samples if entry is not None ])
         next_states = torch.FloatTensor([ entry.next_states for entry in samples if entry is not None ])
-        dones = torch.Tensor([ entry.dones for entry in samples if entry is not None ]).unsqueeze(1)
+        dones = torch.Tensor([ entry.dones for entry in samples if entry is not None ])
 
         return [ states.to(self.device), actions.to(self.device), rewards.to(self.device), next_states.to(self.device), dones.to(self.device) ]
 
