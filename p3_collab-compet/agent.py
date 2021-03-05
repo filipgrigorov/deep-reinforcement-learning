@@ -149,3 +149,7 @@ class MADDPG:
                         predicted_best_current_actions,
                         predicted_best_next_actions,
                         states, actions, rewards, next_states, dones)
+
+    def save(self, actor_weights_path, critic_weights_path):
+        [ torch.save(self.ddpg_agents[idx].learnt_actor.state_dict(), actor_weights_path + str(idx + 1) + '.pth') for idx in range(self.num_agents) ]
+        [ torch.save(self.ddpg_agents[idx].learnt_actor.state_dict(), critic_weights_path + str(idx + 1) + '.pth') for idx in range(self.num_agents) ]
