@@ -46,7 +46,7 @@ class Actor(nn.Module):
         '''Forward pass override of the nn.Module'''
         outputs = F.leaky_relu(self.bn(self.fc[0](state)))
         outputs = F.leaky_relu(self.fc[1](outputs))
-        outputs = torch.tanh(self.fc[-1](outputs))
+        outputs = self.fc[-1](outputs) #torch.tanh(self.fc[-1](outputs))
         return outputs
 
 class Critic(nn.Module):

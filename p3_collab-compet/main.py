@@ -45,7 +45,7 @@ def run_training(config):
 
     config = {
         'seed': 1,
-        'batch_size': 2,#128
+        'batch_size': 128,
         'memory_size': int(1e5),
         'gamma': 0.99,
         'tau': 1e-3,

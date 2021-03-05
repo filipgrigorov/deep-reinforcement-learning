@@ -26,8 +26,8 @@ class DDPGAgent:
         self.actor_optim = optim.Adam(self.learnt_actor.parameters(), lr=config['actor_lr'])
 
         # Learns to evaluate Q(s, mu(s, a); theta_q)
-        self.learnt_critic = Critic(seed, state_size * num_agents, action_size * num_agents, 1).to(self.device) # learnt
-        self.target_critic = Critic(seed, state_size * num_agents, action_size * num_agents, 1).to(self.device) # soft-update tracking
+        self.learnt_critic = Critic(seed, state_size * num_agents, action_size * num_agents, num_agents).to(self.device) # learnt
+        self.target_critic = Critic(seed, state_size * num_agents, action_size * num_agents, num_agents).to(self.device) # soft-update tracking
         self.critic_optim = optim.Adam(self.learnt_critic.parameters(), lr=config['critic_lr'])
 
         print(f'Summary:\nActor network:\n{self.learnt_actor}\nCritic network:\n{self.learnt_critic}')
@@ -74,7 +74,6 @@ class DDPGAgent:
     def __optimize_critic(self, best_next_actions, states, actions, rewards, next_states, dones):
         '''Optimizes the critic approximator'''
         q_targets = rewards + self.gamma * self.target_critic(next_states, best_next_actions) * (1 - dones)
-
         q_predictions = self.learnt_critic(states, actions)
 
         self.critic_optim.zero_grad()
