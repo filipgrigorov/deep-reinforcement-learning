@@ -45,15 +45,15 @@ def run_training(config):
 
     config = {
         'seed': 1,
-        'batch_size': 128,
-        'memory_size': int(1e5),
-        'gamma': 0.99,
+        'batch_size': 1000,
+        'memory_size': int(1e6),
+        'gamma': 0.95,
         'tau': 1e-3,
         'actor_lr': 1e-3,
         'critic_lr': 1e-3,
-        'update_every': 20,
-        'update_iterations': 10,
-        'noise_decay': 0.999
+        'update_every': 2 * num_agents,
+        'update_iterations': 3,
+        'noise_decay': 2
     }
 
     maddpg = MADDPG(state_size, action_size, num_agents, config)
@@ -97,7 +97,7 @@ def run_training(config):
 
             maddpg.step(t)
             
-            scores += rewards                         # update the score (for each agent)
+            scores += np.max(rewards)                         # update the score (for each agent)
             states = next_states                               # roll over states to next time step
             
             if np.any(dones):                                  # exit loop if episode finished
@@ -156,10 +156,10 @@ if __name__ == '__main__':
     config = {
         'env': env,
         'brain_name': brain_name,
-        'episodes': 2000,
-        'ntimesteps': 1000,
+        'episodes': 9000,
+        'ntimesteps': 300,
         'average_over_episodes': 100,
-        'target_score': 30,
+        'target_score': 0.5,
         'num_agents': num_agents, # 2 for each racket
         'state_size': state_size,
         'action_size': action_size,

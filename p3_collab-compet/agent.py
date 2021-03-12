@@ -9,7 +9,7 @@ from noise import OUNoise
 
 class DDPGAgent:
     '''Class representing the DDPG algorithm'''
-    def __init__(self, state_size, action_size, num_agents, device, config):
+    def __init__(self, seed, state_size, action_size, num_agents, device, config):
         '''Class constructor and parameters initialization'''
         self.device = device
 
@@ -17,7 +17,6 @@ class DDPGAgent:
         self.state_size = state_size
         self.action_size = action_size
 
-        seed = config['seed']
         self.gamma = config['gamma']
 
         # Learns argmax_a[Q(s, a); theta_mu] = mu(s, a; theta_mu)
@@ -38,6 +37,9 @@ class DDPGAgent:
         # Noise
         self.noise = OUNoise(action_size, seed)
         self.noise_decay = config['noise_decay']
+
+        self.hard_copy_weights(self.learnt_actor, self.target_actor)
+        self.hard_copy_weights(self.learnt_critic, self.target_critic)
 
     def reset_noise(self):
         '''Reset the noise state'''
@@ -68,18 +70,21 @@ class DDPGAgent:
         self.__soft_update(self.learnt_actor, self.target_actor, self.tau)
         self.__soft_update(self.learnt_critic, self.target_critic, self.tau)
 
-        self.noise_decay *= self.noise_decay
-        self.reset_noise()
+        self.noise_decay *= 0.9999#self.noise_decay
+        #self.reset_noise()
 
     def __optimize_critic(self, best_next_actions, states, actions, rewards, next_states, dones):
         '''Optimizes the critic approximator'''
-        q_targets = rewards + self.gamma * self.target_critic(next_states, best_next_actions) * (1 - dones)
+        with torch.no_grad():
+            q_targets = self.target_critic(next_states, best_next_actions)
+        q_targets = rewards + self.gamma * q_targets * (1 - dones)
         q_predictions = self.learnt_critic(states, actions)
 
         self.critic_optim.zero_grad()
-        critic_loss = F.mse_loss(q_predictions, q_targets)
+        critic_loss = F.mse_loss(q_predictions, q_targets.detach())
         critic_loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.learnt_critic.parameters(), 1)
+        # Note: Control the magnitude of the gradient
+        torch.nn.utils.clip_grad_norm_(self.learnt_critic.parameters(), 0.5)
         self.critic_optim.step()
 
     def __optimize_actor(self, best_current_actions, states):
@@ -89,6 +94,11 @@ class DDPGAgent:
         self.actor_optim.zero_grad()
         advantage.backward()
         self.actor_optim.step()
+
+    def hard_copy_weights(self, learnt, target):
+        """ Copy weights from source to target network (part of initialization)"""
+        for learnt_param, target_param in zip(learnt.parameters(), target.parameters()):
+            target_param.data.copy_(learnt_param.data)
 
     def __soft_update(self, learnt, target, tau):
         '''Soft-updates the target parameters'''
@@ -106,7 +116,7 @@ class MADDPG:
         self.action_size = action_size
         self.num_agents = num_agents
 
-        self.ddpg_agents = [ DDPGAgent(state_size, action_size, num_agents, self.device, config) for _ in range(num_agents) ]
+        self.ddpg_agents = [ DDPGAgent(config['seed'] + idx, state_size, action_size, num_agents, self.device, config) for idx in range(num_agents) ]
 
         self.update_every = config['update_every']
         self.update_iters = config['update_iterations']
