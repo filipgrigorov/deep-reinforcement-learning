@@ -128,6 +128,7 @@ class MADDPG:
         self.memory.to_device(self.device)
 
     def reset_noise(self):
+        '''Resets the noise amplitude for each ddpg agent'''
         [ agent.reset_noise() for agent in self.ddpg_agents ]
 
     def act(self, states):
@@ -141,6 +142,7 @@ class MADDPG:
         self.memory.add(Experience(states, actions, rewards, next_states, dones))
 
     def step(self, timestep):
+        '''Steps through each ddpg agent'''
         if len(self.memory) > self.batch_size and timestep % self.update_every == 0:
             for _ in range(self.update_iters):
                 for idx in range(self.num_agents):
